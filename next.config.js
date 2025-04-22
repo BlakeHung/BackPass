@@ -18,9 +18,6 @@ const nextConfig = {
     ],
     domains: ['vercel.app'],
   },
-  experimental: {
-    serverActions: true,
-  },
   // 添加這兩個配置來忽略建構時的檢查
   typescript: {
     ignoreBuildErrors: true,
