@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function PUT(
+export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -18,22 +18,122 @@ export async function PUT(
     }
 
     const data = await request.json();
+    const { name, startDate, endDate, description, enabled, selectedGroups, groupMembers } = data;
 
-    const activity = await prisma.activity.update({
+    // 1. Update basic activity details
+    await prisma.activity.update({
       where: {
         id: params.id,
       },
       data: {
-        name: data.name,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        description: data.description || "",
-        enabled: data.enabled,
+        name,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        description: description || "",
+        enabled,
         updatedAt: new Date(),
       },
     });
 
-    return NextResponse.json({ data: activity });
+    // 2. Get current groups
+    const currentActivityGroups = await prisma.activityGroup.findMany({
+      where: { activityId: params.id },
+      select: { id: true, groupId: true }
+    });
+    const currentGroupIds = currentActivityGroups.map(ag => ag.groupId);
+
+    // 3. Determine groups to add and remove
+    const groupsToAdd = selectedGroups.filter((groupId: string) => !currentGroupIds.includes(groupId));
+    const groupsToRemove = currentActivityGroups.filter(ag => !selectedGroups.includes(ag.groupId));
+    const groupsToKeep = currentActivityGroups.filter(ag => selectedGroups.includes(ag.groupId));
+
+    // 4. Remove deselected groups
+    if (groupsToRemove.length > 0) {
+      await prisma.activityGroup.deleteMany({
+        where: { id: { in: groupsToRemove.map(ag => ag.id) } },
+      });
+    }
+
+    // 5. Add new groups
+    const newActivityGroups = await Promise.all(
+      groupsToAdd.map(async (groupId: string) => {
+        return prisma.activityGroup.create({
+          data: {
+            activityId: params.id,
+            groupId: groupId,
+            memberCount: 0,
+          },
+          select: { id: true, groupId: true }
+        });
+      })
+    );
+
+    // 6. Update members for all groups
+    const allActivityGroups = [...groupsToKeep, ...newActivityGroups];
+    
+    if (groupMembers && groupMembers.length > 0) {
+      await Promise.all(
+        allActivityGroups.map(async (ag) => {
+          const membersForThisGroup = groupMembers.filter(
+            (m: { groupId: string }) => m.groupId === ag.groupId
+          );
+
+          // Update or create member statuses
+          await Promise.all(
+            membersForThisGroup.map(async (member: { memberId: string; isParticipating: boolean }) => {
+              await prisma.activityGroupMember.upsert({
+                where: {
+                  activityGroupId_groupMemberId: {
+                    activityGroupId: ag.id,
+                    groupMemberId: member.memberId,
+                  }
+                },
+                update: {
+                  isParticipating: member.isParticipating,
+                },
+                create: {
+                  activityGroupId: ag.id,
+                  groupMemberId: member.memberId,
+                  isParticipating: member.isParticipating,
+                },
+              });
+            })
+          );
+
+          // Update member count
+          const participatingMembers = await prisma.activityGroupMember.count({
+            where: {
+              activityGroupId: ag.id,
+              isParticipating: true,
+            },
+          });
+
+          await prisma.activityGroup.update({
+            where: { id: ag.id },
+            data: { memberCount: participatingMembers },
+          });
+        })
+      );
+    }
+
+    // 7. Return updated activity with all relations
+    const updatedActivity = await prisma.activity.findUnique({
+      where: { id: params.id },
+      include: {
+        groups: {
+          include: {
+            group: true,
+            members: {
+              include: {
+                groupMember: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(updatedActivity);
   } catch (error) {
     console.error("[ACTIVITY_UPDATE]", error);
     return NextResponse.json(
@@ -63,6 +163,18 @@ export async function GET(
       where: {
         id: params.id,
       },
+      include: {
+        groups: {
+          include: {
+            group: true,
+            members: {
+              include: {
+                groupMember: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!activity) {
@@ -72,7 +184,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ data: activity });
+    return NextResponse.json(activity);
   } catch (error) {
     console.error("[ACTIVITY_GET]", error);
     return NextResponse.json(

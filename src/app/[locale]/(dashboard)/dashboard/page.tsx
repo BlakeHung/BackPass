@@ -48,6 +48,12 @@ async function getStats() {
       include: {
         category: true,
         user: true,
+        groupMember: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       },
       orderBy: {
         date: 'desc',

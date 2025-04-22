@@ -1,48 +1,66 @@
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { redirect, notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { TransactionForm } from "@/components/TransactionForm";
 import { getTranslations } from 'next-intl/server';
 
 type PageProps = {
-  params: Promise<{ id: string; locale: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  params: { id: string };
 };
 
 export default async function EditTransactionPage({
-  params,
-  searchParams,
+  params: { id },
 }: PageProps) {
-  const { id, locale } = await params;
   const t = await getTranslations('transactions');
-  const queryParams = await searchParams;
-  console.log(queryParams);
   const session = await getServerSession(authOptions);
-  
   if (!session) {
     redirect('/login');
   }
 
+  // 獲取交易記錄
   const transaction = await prisma.transaction.findUnique({
     where: { id },
-    include: { category: true },
+    include: {
+      category: true,
+      activity: {
+        include: {
+          groups: {
+            include: {
+              members: {
+                include: {
+                  groupMember: {
+                    select: {
+                      id: true,
+                      name: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      groupMember: {
+        select: {
+          id: true,
+          name: true
+        }
+      }
+    }
   });
-  console.log(transaction)
-  if (!transaction) {
-    notFound();
-  }
 
-  // 檢查權限
-  const isOwner = transaction.userId === session.user.id;
-  const isAdmin = session.user.role === 'ADMIN';
-  if (!isOwner && !isAdmin) {
+  if (!transaction) {
     redirect('/transactions');
   }
 
-  // 格式化交易日期為 YYYY-MM-DD
-  const formattedDate = transaction.date.toISOString().split('T')[0];
+  // 檢查權限
+  const canManagePayments = session.user.role === 'ADMIN' || session.user.role === 'FINANCE_MANAGER';
+  if (!canManagePayments) {
+    redirect('/transactions');
+  }
 
+  // 獲取分類列表
   const categories = await prisma.category.findMany({
     where: {
       type: transaction.type,
@@ -52,34 +70,62 @@ export default async function EditTransactionPage({
     },
   });
 
+  // 獲取進行中的活動，包含參與者信息
   const activities = await prisma.activity.findMany({
+    where: {
+      status: 'ACTIVE',
+    },
     orderBy: {
       startDate: 'desc',
     },
-    select: {
-      id: true,
-      name: true,
-    },
+    include: {
+      groups: {
+        include: {
+          members: {
+            include: {
+              groupMember: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   });
-  
-  const canManagePayments = session.user.role === 'ADMIN' || session.user.role === 'FINANCE_MANAGER';
+
+  // 格式化活動數據，包含參與者
+  const formattedActivities = activities.map(activity => ({
+    id: activity.id,
+    name: activity.name,
+    participants: activity.groups.flatMap(group => 
+      group.members.map(member => member.groupMember)
+    )
+  }));
 
   return (
     <div className="container mx-auto p-4">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">{t('form.title_edit')}</h1>
+        <h1 className="text-2xl font-bold mb-6">
+          {transaction.type === 'EXPENSE' ? t('edit_expense') : t('edit_income')}
+        </h1>
         <TransactionForm 
-          type={transaction.type}
-          categories={categories}
-          activities={activities}
+          type={transaction.type as 'EXPENSE' | 'INCOME'} 
+          categories={categories.map(cat => ({
+            ...cat,
+            type: cat.type as 'EXPENSE' | 'INCOME'
+          }))}
+          activities={formattedActivities}
           defaultValues={{
             amount: transaction.amount,
             categoryId: transaction.categoryId,
+            date: transaction.date,
             activityId: transaction.activityId || 'none',
-            date: formattedDate,
+            payerId: transaction.groupMember?.id || null,
             description: transaction.description || '',
-            images: transaction.images || [],
-            paymentStatus: transaction.paymentStatus,
+            images: transaction.images || []
           }}
           transactionId={transaction.id}
           canManagePayments={canManagePayments}

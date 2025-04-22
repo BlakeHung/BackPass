@@ -6,12 +6,10 @@ import { TransactionForm } from "@/components/TransactionForm";
 import { getTranslations } from 'next-intl/server';
 
 type PageProps = {
-  params: { locale: string };
   searchParams: Promise<{ type: 'EXPENSE' | 'INCOME' }>;
 };
 
 export default async function NewTransactionPage({
-  params: { locale },
   searchParams,
 }: PageProps) {
   const t = await getTranslations('transactions');
@@ -30,9 +28,8 @@ export default async function NewTransactionPage({
       name: 'asc',
     },
   });
-  const today = new Date().toISOString().split('T')[0];  // 格式化今天的日期為 YYYY-MM-DD
 
-  // 獲取進行中的活動，按創建時間降序排序
+  // 獲取進行中的活動，包含參與者信息
   const activities = await prisma.activity.findMany({
     where: {
       status: 'ACTIVE',
@@ -40,14 +37,36 @@ export default async function NewTransactionPage({
     orderBy: {
       startDate: 'desc',
     },
-    select: {
-      id: true,
-      name: true,
-    },
+    include: {
+      groups: {
+        include: {
+          members: {
+            include: {
+              groupMember: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   });
-  console.log(activities)
-  // 獲取最新創建的活動（如果有的話）
-  const latestActivity = activities[0];
+
+  // 格式化活動數據，包含參與者
+  const formattedActivities = activities.map(activity => ({
+    id: activity.id,
+    name: activity.name,
+    participants: activity.groups.flatMap(group => 
+      group.members.map(member => member.groupMember)
+    )
+  }));
+
+  const today = new Date();  // 使用 Date 對象
+  const latestActivity = formattedActivities[0];
+  const canManagePayments = session.user.role === 'ADMIN' || session.user.role === 'FINANCE_MANAGER';
 
   return (
     <div className="container mx-auto p-4">
@@ -57,12 +76,21 @@ export default async function NewTransactionPage({
         </h1>
         <TransactionForm 
           type={queryParams.type} 
-          categories={categories}
-          activities={activities}
+          categories={categories.map(cat => ({
+            ...cat,
+            type: cat.type as 'EXPENSE' | 'INCOME'
+          }))}
+          activities={formattedActivities}
           defaultValues={{
+            amount: 0,
+            categoryId: categories[0]?.id || '',
             date: today,
-            activityId: latestActivity?.id || 'none', // 預設最新活動
+            activityId: latestActivity?.id || 'none',
+            payerId: null,
+            description: '',
+            images: []
           }}
+          canManagePayments={canManagePayments}
         />
       </div>
     </div>

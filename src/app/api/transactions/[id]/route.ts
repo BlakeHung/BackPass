@@ -27,7 +27,7 @@ export async function PUT(
     }
 
     // 檢查權限
-    const isOwner = transaction.createdBy === session.user.id;
+    const isOwner = transaction.userId === session.user.id;
     const isAdmin = session.user.role === 'ADMIN';
     if (!isOwner && !isAdmin) {
       return new NextResponse("Forbidden", { status: 403 });
@@ -55,6 +55,7 @@ export async function PUT(
         description: body.description,
         activityId: body.activityId,
         status: body.status,
+        groupMemberId: body.groupMemberId,
         updatedAt: new Date(),
       },
     });

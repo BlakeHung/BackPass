@@ -38,13 +38,48 @@ export default async function EditActivityPage({
     redirect('/transactions');
   }
 
+  // 獲取活動資料，包含群組和成員
   const activity = await prisma.activity.findUnique({
     where: { id },
+    include: {
+      groups: {
+        include: {
+          group: true,
+          members: {
+            include: {
+              groupMember: true,
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!activity) {
     notFound();
   }
+
+  // 獲取所有可用的群組
+  const groups = await prisma.group.findMany({
+    include: {
+      members: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  // 準備表單初始值
+  const selectedGroups = activity.groups.map(ag => ag.groupId);
+  const groupMembers = activity.groups.flatMap(ag => 
+    ag.members.map(m => ({
+      groupId: ag.groupId,
+      memberId: m.groupMember.id,
+      isParticipating: m.isParticipating,
+    }))
+  );
 
   return (
     <div className="container mx-auto p-4">
@@ -57,8 +92,11 @@ export default async function EditActivityPage({
             endDate: activity.endDate,
             description: activity.description || '',
             enabled: activity.enabled,
+            selectedGroups,
+            groupMembers,
           }}
           activityId={activity.id}
+          groups={groups}
         />
       </div>
     </div>

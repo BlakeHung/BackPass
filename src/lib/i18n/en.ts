@@ -183,7 +183,11 @@ const en = {
       actions: 'Actions'
     },
     new_expense: 'New Expense',
-    new_income: 'New Income'
+    new_income: 'New Income',
+    payer: 'Payer',
+    select_payer: 'Select Payer',
+    no_participants_for_activity: 'No participants in this activity',
+    payer_required: 'Please select a payer',
   },
   
   categories: {
@@ -333,7 +337,13 @@ const en = {
     submit_error_message: 'Submission failed, please try again later',
     name_required: 'Please enter activity name',
     start_date_required: 'Please select start date',
-    end_date_required: 'Please select end date'
+    end_date_required: 'Please select end date',
+    select_groups: 'Select Groups',
+    no_groups_available: 'No groups available currently',
+    group_selection_required: 'Please select at least one group',
+    member_participation: 'Member Participation Status',
+    member_name: 'Member Name',
+    participation_status: 'Participation Status',
   },
   
   activity_detail: {

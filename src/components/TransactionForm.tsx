@@ -1,28 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Image from "next/image";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { useSession } from "next-auth/react";
-import { toast } from "sonner";
-import { ImageUpload } from "./ImageUpload";
 import { useTranslations } from 'next-intl';
+import { Input } from "@/components/ui/input";
+
+interface GroupMember {
+  id: string;
+  name: string;
+}
+
+interface Activity {
+  id: string;
+  name: string;
+  participants: GroupMember[];
+}
 
 const transactionSchema = z.object({
   amount: z.number().positive("金額必須大於 0"),
   categoryId: z.string().min(1, "請選擇類別"),
-  date: z.date(),
+  date: z.coerce.date(),
   description: z.string().optional(),
   images: z.array(z.string()).optional(),
-  activityId: z.string().optional(),
+  activityId: z.string().optional().nullable(),
+  payerId: z.string().optional().nullable(),
 });
 
 type TransactionFormData = z.infer<typeof transactionSchema>;
@@ -33,11 +41,6 @@ interface Category {
   type: 'EXPENSE' | 'INCOME';
 }
 
-interface Activity {
-  id: string;
-  name: string;
-}
-
 interface TransactionFormProps {
   categories: Category[];
   activities: Activity[];
@@ -45,11 +48,11 @@ interface TransactionFormProps {
   defaultValues?: {
     amount: number;
     categoryId: string;
-    activityId?: string;
+    activityId?: string | null;
+    payerId?: string | null;
     date: Date;
     description?: string;
     images?: string[];
-    paymentStatus?: string;
   };
   transactionId?: string;
   canManagePayments?: boolean;
@@ -61,41 +64,64 @@ export function TransactionForm({
   type,
   defaultValues,
   transactionId,
-  canManagePayments = false,
+  canManagePayments,
 }: TransactionFormProps) {
   const t = useTranslations('transactions');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewImages, setPreviewImages] = useState<string[]>(
     defaultValues?.images || []
   );
-  const [isPaid, setIsPaid] = useState(defaultValues?.paymentStatus === 'PAID');
+  const [potentialPayers, setPotentialPayers] = useState<GroupMember[]>([]);
+  const [activitySearch, setActivitySearch] = useState("");
+  const [payerSearch, setPayerSearch] = useState("");
   const router = useRouter();
-  const { data: session } = useSession();
-  const isDemo = session?.user?.email === 'demo@wchung.tw';
-
-  const today = new Date().toISOString().split('T')[0];
 
   const {
     register,
     handleSubmit,
-    reset,
     setValue,
     formState: { errors },
     watch,
   } = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
-    defaultValues: defaultValues || {
-      date: today,
+    defaultValues: defaultValues ? {
+        ...defaultValues,
+        date: defaultValues.date || new Date(),
+        activityId: defaultValues.activityId === undefined ? null : defaultValues.activityId,
+        payerId: defaultValues.payerId === undefined ? null : defaultValues.payerId,
+    } : {
+        date: new Date(),
+        activityId: null,
+        payerId: null,
     }
   });
+  
+  const watchedActivityId = watch("activityId");
+
+  useEffect(() => {
+    if (watchedActivityId) {
+      const selectedActivity = activities.find(act => act.id === watchedActivityId);
+      setPotentialPayers(selectedActivity?.participants || []);
+    } else {
+      setPotentialPayers([]);
+      setValue('payerId', null);
+    }
+  }, [watchedActivityId, activities, setValue]);
+
+  useEffect(() => {
+    if (defaultValues?.activityId) {
+        const initialActivity = activities.find(act => act.id === defaultValues.activityId);
+        setPotentialPayers(initialActivity?.participants || []);
+    }
+  }, [defaultValues, activities]);
 
   const handleImageUpload = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", "amis_management"); // 替換為你的 Cloudinary upload preset
+    formData.append("upload_preset", "amis_management");
 
     const response = await fetch(
-      "https://api.cloudinary.com/v1_1/dfaittd9e/image/upload", // 替換為你的 Cloudinary cloud name
+      "https://api.cloudinary.com/v1_1/dfaittd9e/image/upload",
       {
         method: "POST",
         body: formData,
@@ -124,16 +150,20 @@ export function TransactionForm({
         : '/api/transactions';
       
       const method = transactionId ? 'PUT' : 'POST';
+      const requestData = {
+        ...data,
+        type,
+        groupMemberId: data.payerId,
+      };
+      
+      console.log('Sending data:', JSON.stringify(requestData, null, 2));
+      
       const response = await fetch(url, {
         method: method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...data,
-          type,
-          paymentStatus: isPaid ? 'PAID' : 'UNPAID',
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
@@ -148,6 +178,14 @@ export function TransactionForm({
       setIsSubmitting(false);
     }
   };
+
+  const filteredActivities = activities.filter(activity => 
+    activity.name.toLowerCase().includes(activitySearch.toLowerCase())
+  );
+
+  const filteredPayers = potentialPayers.filter(payer => 
+    payer.name.toLowerCase().includes(payerSearch.toLowerCase())
+  );
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -248,7 +286,6 @@ export function TransactionForm({
 
       <div className="space-y-2">
         <Label htmlFor="activityId">{t('activity')}</Label>
-        
         <Select
           value={watch('activityId') || 'none'}
           onValueChange={(value) => setValue('activityId', value === 'none' ? null : value)}
@@ -256,9 +293,17 @@ export function TransactionForm({
           <SelectTrigger>
             <SelectValue placeholder={t('select_activity')} />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[300px] overflow-y-auto">
+            <div className="sticky top-0 z-10 bg-background p-2">
+              <Input
+                placeholder={t('search_activity')}
+                value={activitySearch}
+                onChange={(e) => setActivitySearch(e.target.value)}
+                className="mb-2"
+              />
+            </div>
             <SelectItem value="none">{t('no_activity')}</SelectItem>
-            {activities?.map((activity) => (
+            {filteredActivities.map((activity) => (
               <SelectItem key={activity.id} value={activity.id}>
                 {activity.name}
               </SelectItem>
@@ -267,17 +312,53 @@ export function TransactionForm({
         </Select>
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="payerId">{t('payer')}</Label>
+        <Select
+          value={watch('payerId') || undefined}
+          onValueChange={(value) => setValue('payerId', value)}
+          disabled={!watchedActivityId || potentialPayers.length === 0}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={t('select_payer')} />
+          </SelectTrigger>
+          <SelectContent className="max-h-[300px] overflow-y-auto">
+            <div className="sticky top-0 z-10 bg-background p-2">
+              <Input
+                placeholder={t('search_payer')}
+                value={payerSearch}
+                onChange={(e) => setPayerSearch(e.target.value)}
+                className="mb-2"
+              />
+            </div>
+            {potentialPayers.length === 0 && watchedActivityId ? (
+              <SelectItem value="no_participants" disabled>
+                {t('no_participants_for_activity')}
+              </SelectItem>
+            ) : (
+              filteredPayers.map((payer) => (
+                <SelectItem key={payer.id} value={payer.id}>
+                  {payer.name}
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+        {errors.payerId && (
+          <p className="mt-1 text-sm text-red-600">{t('payer_required')}</p>
+        )}
+      </div>
+
       <div className="flex justify-end gap-4 mt-6">
-        <LoadingButton
+        <button
           type="button"
-          variant="outline"
           onClick={() => router.back()}
           disabled={isSubmitting}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md"
         >
           {t('cancel')}
-        </LoadingButton>
+        </button>
         <LoadingButton
-          type="submit"
           isLoading={isSubmitting}
           loadingText={t('saving')}
         >

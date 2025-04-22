@@ -63,6 +63,7 @@ export async function POST(request: Request) {
         activityId: data.activityId || defaultActivity.id,
         status: "PENDING",
         images: data.images || [],
+        groupMemberId: data.groupMemberId || null,
       },
     });
 
@@ -98,7 +99,7 @@ export async function GET(request: Request) {
     const order = searchParams.get('order') || 'desc';
 
     // 檢查是否有權限查看所有記錄
-    const canViewAll = session.user.role === 'ADMIN' || session.user.role === 'FINANCE';
+    const canViewAll = session.user.role === 'ADMIN' || session.user.role === 'FINANCE_MANAGER';
 
     const transactions = await prisma.transaction.findMany({
       where: {
