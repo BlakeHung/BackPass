@@ -122,8 +122,8 @@ export default async function EditTransactionPage({
             amount: transaction.amount,
             categoryId: transaction.categoryId,
             date: transaction.date,
-            activityId: transaction.activityId || 'none',
-            payerId: transaction.groupMember?.id || null,
+            activityId: transaction.activityId || '',
+            payerId: transaction.groupMember?.id || '',
             description: transaction.description || '',
             images: transaction.images || []
           }}

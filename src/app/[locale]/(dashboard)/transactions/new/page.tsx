@@ -85,8 +85,8 @@ export default async function NewTransactionPage({
             amount: 0,
             categoryId: categories[0]?.id || '',
             date: today,
-            activityId: latestActivity?.id || 'none',
-            payerId: null,
+            activityId: '',
+            payerId: '',
             description: '',
             images: []
           }}

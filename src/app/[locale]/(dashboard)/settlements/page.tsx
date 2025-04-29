@@ -10,22 +10,51 @@ export default async function SettlementsPage() {
     redirect("/login");
   }
 
-  // 獲取所有活動的結算記錄
-  const settlements = await prisma.activitySettlement.findMany({
+  // 獲取所有活動
+  const activities = await prisma.activity.findMany({
+    where: {
+      status: "ACTIVE",
+      enabled: true,
+    },
     include: {
-      activity: true,
-      groupMember: true,
-      settledByUser: {
-        select: { name: true },
+      groups: {
+        include: {
+          members: {
+            include: {
+              groupMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
       },
       transactions: {
-        where: { isSettlementPayment: true },
+        where: {
+          type: "EXPENSE",
+          status: "APPROVED",
+        },
+        include: {
+          groupMember: {
+            select: {
+              id: true,
+              name: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
       },
     },
     orderBy: {
       createdAt: "desc",
     },
   });
-
-  return <SettlementCenter settlements={settlements} />;
+  console.log(activities);
+  return <SettlementCenter activities={activities} />;
 }
