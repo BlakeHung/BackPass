@@ -27,6 +27,7 @@ model User {
   groupMembers  GroupMember[]       // 用戶在群組中的成員身份
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
+  settledPayments ActivitySettlement[] @relation("SettledByUser")
 }
 
 model Category {
@@ -85,27 +86,28 @@ model EDM {
 }
 
 model Transaction {
-  id            String      @id @default(auto()) @map("_id") @db.ObjectId
-  amount        Float
-  type          String      // 'EXPENSE' | 'INCOME'
-  date          DateTime
-  description   String?
-  images        String[]
-  categoryId    String      @db.ObjectId
-  category      Category    @relation(fields: [categoryId], references: [id])
-  groupMemberId String?     @db.ObjectId
-  groupMember   GroupMember? @relation(fields: [groupMemberId], references: [id])
-  activityId    String?     @db.ObjectId
-  activity      Activity?   @relation(fields: [activityId], references: [id])
-  status        String      @default("PENDING") // PENDING, APPROVED, REJECTED
-  groupId       String?     @db.ObjectId
-  group         Group?      @relation(fields: [groupId], references: [id])
-  settlementId  String?     @db.ObjectId  // 新增: 關聯到結帳記錄
-  settlement    ActivitySettlement? @relation(fields: [settlementId], references: [id]) // 新增: 關聯到結帳記錄
-  user          User        @relation("UserTransactions", fields: [userId], references: [id])
-  userId        String      @db.ObjectId
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id                 String              @id @default(auto()) @map("_id") @db.ObjectId
+  amount             Float
+  type               String              // 'EXPENSE' | 'INCOME'
+  date               DateTime
+  description        String?
+  images             String[]
+  categoryId         String              @db.ObjectId
+  category           Category            @relation(fields: [categoryId], references: [id])
+  groupMemberId      String?             @db.ObjectId
+  groupMember        GroupMember?        @relation(fields: [groupMemberId], references: [id])
+  activityId         String?             @db.ObjectId
+  activity           Activity?           @relation(fields: [activityId], references: [id])
+  status             String              @default("PENDING") // PENDING, APPROVED, REJECTED
+  groupId            String?             @db.ObjectId
+  group              Group?              @relation(fields: [groupId], references: [id])
+  settlementId       String?             @db.ObjectId
+  settlement         ActivitySettlement? @relation(fields: [settlementId], references: [id])
+  user               User                @relation("UserTransactions", fields: [userId], references: [id])
+  userId             String              @db.ObjectId
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  isSettlementPayment Boolean            @default(false)
 }
 
 // 群體定義
@@ -166,6 +168,7 @@ model ActivityGroupMember {
   note            String?       // 備註
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  settlements     ActivitySettlement[] @relation("ActivityGroupMemberSettlements")
 
   @@unique([activityGroupId, groupMemberId])
 }
@@ -191,12 +194,17 @@ model ActivitySettlement {
   groupMember     GroupMember   @relation(fields: [groupMemberId], references: [id])
   groupMemberId   String        @db.ObjectId
   shouldPay       Float         // 應付金額
-  paidAmount      Float         // 已付金額（從 Transaction 統計）
+  paidAmount      Float         // 已付金額
   balance         Float         // 待付金額（shouldPay - paidAmount）
-  status          String        @default("PENDING") // PENDING, PAID
+  status          String        @default("PENDING") // 狀態: PENDING, PARTIAL, PAID, OVERPAID
+  paymentMethod   String?       // 付款方式
+  settledBy       String?       @db.ObjectId // 處理人員ID
+  settledByUser   User?         @relation("SettledByUser", fields: [settledBy], references: [id]) // 處理人員關聯
   note            String?       // 備註
   settledAt       DateTime?     // 關帳時間
   transactions    Transaction[] // 關聯的交易
+  activityGroupMember ActivityGroupMember? @relation("ActivityGroupMemberSettlements", fields: [activityGroupMemberId], references: [id])
+  activityGroupMemberId String? @db.ObjectId
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
