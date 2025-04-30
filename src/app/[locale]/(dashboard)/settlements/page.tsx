@@ -44,6 +44,7 @@ export default async function SettlementsPage() {
               },
             },
           },
+          category: true,
         },
       },
     },

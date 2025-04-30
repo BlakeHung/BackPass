@@ -2,12 +2,15 @@
 
 'use client';
 
-import { useState } from 'react';
-import { Activity, ActivityGroup, ActivityGroupMember, Transaction } from '@prisma/client';
+import { useState, Fragment } from 'react';
+import { Activity, ActivityGroup, ActivityGroupMember, Transaction, Category } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { format } from 'date-fns';
+import { zhTW } from 'date-fns/locale';
 
 interface ActivityWithGroups extends Activity {
   groups: (ActivityGroup & {
@@ -31,6 +34,7 @@ interface ActivityWithGroups extends Activity {
         name: string;
       } | null;
     } | null;
+    category: Category;
   })[];
 }
 
@@ -40,6 +44,7 @@ interface SettlementCenterProps {
 
 export function SettlementCenter({ activities }: SettlementCenterProps) {
   const [selectedActivity, setSelectedActivity] = useState<ActivityWithGroups | null>(null);
+  const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
 
   // 獲取所有參與者（從所有群組的成員）
   const participants = selectedActivity?.groups.flatMap(group => 
@@ -57,6 +62,16 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
     ? totalExpense / participants.length 
     : 0;
 
+  const toggleParticipant = (participantId: string) => {
+    const newExpanded = new Set(expandedParticipants);
+    if (newExpanded.has(participantId)) {
+      newExpanded.delete(participantId);
+    } else {
+      newExpanded.add(participantId);
+    }
+    setExpandedParticipants(newExpanded);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -73,6 +88,7 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
             onValueChange={(value) => {
               const activity = activities.find(a => a.id === value);
               setSelectedActivity(activity || null);
+              setExpandedParticipants(new Set());
             }}
           >
             <SelectTrigger className="w-full">
@@ -104,6 +120,7 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]"></TableHead>
                   <TableHead>參與者</TableHead>
                   <TableHead>應付金額</TableHead>
                   <TableHead>已付金額</TableHead>
@@ -112,20 +129,54 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
               </TableHeader>
               <TableBody>
                 {participants.map((participant) => {
-                  // 計算該參與者已付金額
-                  const paidAmount = selectedActivity.transactions
+                  // 獲取該參與者的所有交易
+                  const participantTransactions = selectedActivity.transactions
                     .filter(t => t.groupMember?.id === participant.id)
-                    .reduce((sum, t) => sum + t.amount, 0);
+                    .sort((a, b) => b.date.getTime() - a.date.getTime()); // 按日期排序
 
+                  // 計算該參與者已付金額
+                  const paidAmount = participantTransactions.reduce((sum, t) => sum + t.amount, 0);
                   const balance = perPersonAmount - paidAmount;
+                  const isExpanded = expandedParticipants.has(participant.id);
 
                   return (
-                    <TableRow key={participant.id}>
-                      <TableCell>{participant.name}</TableCell>
-                      <TableCell>${perPersonAmount.toFixed(2)}</TableCell>
-                      <TableCell>${paidAmount.toFixed(2)}</TableCell>
-                      <TableCell>${balance.toFixed(2)}</TableCell>
-                    </TableRow>
+                    <Fragment key={participant.id}>
+                      <TableRow>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleParticipant(participant.id)}
+                          >
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </Button>
+                        </TableCell>
+                        <TableCell>{participant.name}</TableCell>
+                        <TableCell>${perPersonAmount.toFixed(2)}</TableCell>
+                        <TableCell>${paidAmount.toFixed(2)}</TableCell>
+                        <TableCell>${balance.toFixed(2)}</TableCell>
+                      </TableRow>
+                      {isExpanded && participantTransactions.map((transaction) => (
+                        <TableRow key={transaction.id} className="bg-muted/50">
+                          <TableCell></TableCell>
+                          <TableCell colSpan={4}>
+                            <div className="flex justify-between items-center">
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {transaction.type === 'PAYMENT' ? '支付' : '收入'}: {transaction.description || '無描述'}
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                  {format(transaction.date, 'yyyy/MM/dd', { locale: zhTW })} - {transaction.category.name}
+                                </span>
+                              </div>
+                              <span className={`font-medium ${transaction.type === 'PAYMENT' ? 'text-red-500' : 'text-green-500'}`}>
+                                {transaction.type === 'PAYMENT' ? '-' : '+'}${transaction.amount.toFixed(2)}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </Fragment>
                   );
                 })}
               </TableBody>

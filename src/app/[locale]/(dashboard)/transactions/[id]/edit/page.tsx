@@ -50,6 +50,7 @@ export default async function EditTransactionPage({
     }
   });
 
+  console.log(transaction);
   if (!transaction) {
     redirect('/transactions');
   }
