@@ -23,11 +23,6 @@ interface ActivityWithGroups extends Activity {
     })[];
   })[];
   transactions: (Transaction & {
-    user: {
-      id: string;
-      name: string;
-      email: string;
-    };
     groupMember: {
       id: string;
       name: string;
@@ -51,7 +46,6 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
     group.members.map(member => ({
       id: member.groupMember.id,
       name: member.groupMember.user?.name || member.groupMember.name,
-      userId: member.groupMember.user?.id,
     }))
   ) || [];
 
@@ -120,12 +114,7 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
                 {participants.map((participant) => {
                   // 計算該參與者已付金額
                   const paidAmount = selectedActivity.transactions
-                    .filter(t => {
-                      // 檢查是否是該參與者的交易
-                      if (t.groupMember?.id === participant.id) return true;
-                      if (t.user.id === participant.userId) return true;
-                      return false;
-                    })
+                    .filter(t => t.groupMember?.id === participant.id)
                     .reduce((sum, t) => sum + t.amount, 0);
 
                   const balance = perPersonAmount - paidAmount;

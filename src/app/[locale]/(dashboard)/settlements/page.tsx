@@ -31,10 +31,6 @@ export default async function SettlementsPage() {
         },
       },
       transactions: {
-        where: {
-          type: "EXPENSE",
-          status: "APPROVED",
-        },
         include: {
           groupMember: {
             select: {

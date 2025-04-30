@@ -61,7 +61,7 @@ export async function POST(request: Request) {
         categoryId: data.categoryId,
         userId: session.user.id,
         activityId: data.activityId || defaultActivity.id,
-        status: "PENDING",
+        status: "APPROVED",
         images: data.images || [],
         groupMemberId: data.groupMemberId || null,
       },
