@@ -47,6 +47,7 @@ export default async function SettlementsPage() {
           category: true,
         },
       },
+      settlements: true,
     },
     orderBy: {
       createdAt: "desc",
