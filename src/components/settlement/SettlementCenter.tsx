@@ -5,10 +5,11 @@
 import { useState, Fragment } from 'react';
 import { Activity, ActivityGroup, ActivityGroupMember, Transaction, Category } from '@prisma/client';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import Autocomplete from '@mui/material/Autocomplete';
+import TextField from '@mui/material/TextField';
 
 interface ActivityWithGroups extends Activity {
   groups: (ActivityGroup & {
@@ -155,25 +156,20 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
           <CardTitle>選擇活動</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select
-            value={selectedActivity?.id}
-            onValueChange={(value) => {
-              const activity = activities.find(a => a.id === value);
-              setSelectedActivity(activity || null);
+          <Autocomplete
+            options={activities}
+            getOptionLabel={(option) => option.name}
+            value={selectedActivity}
+            onChange={(_, value) => {
+              setSelectedActivity(value);
               setExpandedParticipants(new Set());
             }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="選擇活動" />
-            </SelectTrigger>
-            <SelectContent>
-              {activities.map((activity) => (
-                <SelectItem key={activity.id} value={activity.id}>
-                  {activity.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            renderInput={(params) => (
+              <TextField {...params} label="搜尋活動..." variant="outlined" fullWidth />
+            )}
+            sx={{ minWidth: 240, maxWidth: 400 }}
+          />
         </CardContent>
       </Card>
 
@@ -364,7 +360,7 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
                                 size="sm"
                                 onClick={() => toggleParticipant(participant.id)}
                               >
-                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                {isExpanded ? <ChevronRight className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                               </Button>
                             </TableCell>
                             <TableCell>{participant.name}</TableCell>
@@ -481,7 +477,7 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
                           size="sm"
                           onClick={() => toggleParticipant(participant.id)}
                         >
-                          {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                          {isExpanded ? <ChevronRight className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
                         </Button>
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2 text-sm">
