@@ -182,6 +182,10 @@ const zh = {
     select_payer: '選擇付款人',
     no_participants_for_activity: '此活動沒有參與者',
     payer_required: '請選擇付款人',
+    no_expenses: '沒有支出',
+    search_payer: '搜尋付款人',
+    search_activity: '搜尋活動',
+    edit_expense: '編輯支出',
   },
   
   categories: {

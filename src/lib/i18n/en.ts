@@ -188,6 +188,10 @@ const en = {
     select_payer: 'Select Payer',
     no_participants_for_activity: 'No participants in this activity',
     payer_required: 'Please select a payer',
+    no_expenses: 'No expenses',
+    search_payer: 'Search payer',
+    search_activity: 'Search activity',
+    edit_expense: 'Edit Expense',
   },
   
   categories: {
