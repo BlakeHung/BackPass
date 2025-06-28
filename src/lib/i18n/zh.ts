@@ -74,6 +74,19 @@ const zh = {
       ended: '已結束'
     },
     new_activity: '新增活動',
+    view_settlements: '查看結算',
+    ongoing: '進行中',
+    ended: '已結束',
+    expense_count: '筆支出',
+    edit_activity: '編輯活動',
+    edm_management: 'EDM 管理',
+    activity_description: '活動描述',
+    edm_preview: 'EDM 預覽',
+    register_now: '立即報名',
+    expense_records: '支出記錄',
+    no_description: '無描述',
+    recorder: '記錄者',
+    no_expense_records: '沒有支出記錄',
   },
   
   dashboard: {
@@ -182,6 +195,10 @@ const zh = {
     select_payer: '選擇付款人',
     no_participants_for_activity: '此活動沒有參與者',
     payer_required: '請選擇付款人',
+    no_expenses: '沒有支出',
+    search_payer: '搜尋付款人',
+    search_activity: '搜尋活動',
+    edit_expense: '編輯支出',
   },
   
   categories: {
@@ -236,6 +253,9 @@ const zh = {
     total_income: '總收入',
     total_expense: '總支出',
     net: '淨額',
+    pending_payments: '待付款金額',
+    activity_total_expense: '活動總支出',
+    activity_stats: '活動統計',
   },
   
   sidebar: {

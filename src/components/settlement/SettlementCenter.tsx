@@ -165,6 +165,11 @@ export function SettlementCenter({ activities }: SettlementCenterProps) {
               setExpandedParticipants(new Set());
             }}
             isOptionEqualToValue={(option, value) => option.id === value.id}
+            renderOption={(props, option) => (
+              <li {...props} key={option.id}>
+                {option.name}
+              </li>
+            )}
             renderInput={(params) => (
               <TextField {...params} label="搜尋活動..." variant="outlined" fullWidth />
             )}

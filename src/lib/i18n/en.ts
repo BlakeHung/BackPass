@@ -74,6 +74,19 @@ const en = {
       ended: 'Ended'
     },
     new_activity: 'New Activity',
+    view_settlements: 'View Settlements',
+    ongoing: 'Ongoing',
+    ended: 'Ended',
+    expense_count: 'expenses',
+    edit_activity: 'Edit Activity',
+    edm_management: 'EDM Management',
+    activity_description: 'Activity Description',
+    edm_preview: 'EDM Preview',
+    register_now: 'Register Now',
+    expense_records: 'Expense Records',
+    no_description: 'No description',
+    recorder: 'Recorder',
+    no_expense_records: 'No expense records',
   },
   
   dashboard: {
@@ -188,6 +201,10 @@ const en = {
     select_payer: 'Select Payer',
     no_participants_for_activity: 'No participants in this activity',
     payer_required: 'Please select a payer',
+    no_expenses: 'No expenses',
+    search_payer: 'Search payer',
+    search_activity: 'Search activity',
+    edit_expense: 'Edit Expense',
   },
   
   categories: {
@@ -242,6 +259,9 @@ const en = {
     total_income: 'Total Income',
     total_expense: 'Total Expense',
     net: 'Net',
+    pending_payments: 'Pending Payments',
+    activity_total_expense: 'Activity Total Expense',
+    activity_stats: 'Activity Statistics',
   },
   
   sidebar: {
