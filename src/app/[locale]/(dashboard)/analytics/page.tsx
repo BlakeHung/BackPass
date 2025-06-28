@@ -3,13 +3,20 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, CreditCard, Activity, ArrowDown, ArrowUp } from "lucide-react";
+import { CreditCard, Activity, ArrowDown, ArrowUp } from "lucide-react";
 import { TransactionChart } from "@/components/analytics/TransactionChart";
 import { ActivityStats } from "@/components/analytics/ActivityStats";
 import { CategoryChart } from "@/components/analytics/CategoryChart";
 import { MonthlyComparison } from "@/components/analytics/MonthlyComparison";
+import { getTranslations } from 'next-intl/server';
 
-export default async function AnalyticsPage() {
+interface PageProps {
+  params: Promise<{ locale: string }>;
+}
+
+export default async function AnalyticsPage({ params }: PageProps) {
+  const { locale } = await params;
+  const t = await getTranslations('analytics');
   const session = await getServerSession(authOptions);
   
   if (!session) {
@@ -44,10 +51,10 @@ export default async function AnalyticsPage() {
     { income: 0, expense: 0 }
   );
 
-  // 獲取待付款金額
+  // 獲取待付款金額 (使用 status 字段代替不存在的 paymentStatus)
   const unpaidAmount = await prisma.transaction.aggregate({
     where: {
-      paymentStatus: 'UNPAID',
+      status: 'PENDING',
     },
     _sum: {
       amount: true,
@@ -87,7 +94,7 @@ export default async function AnalyticsPage() {
   });
 
   // 處理圖表數據
-  const chartData = dailyTransactions.reduce((acc: any[], transaction) => {
+  const chartData = dailyTransactions.reduce((acc: Array<{date: string; income: number; expense: number}>, transaction) => {
     const date = transaction.date.toISOString().split('T')[0];
     const existing = acc.find(item => item.date === date);
     
@@ -108,7 +115,7 @@ export default async function AnalyticsPage() {
     return acc;
   }, []);
 
-  // 獲取活動詳細統計
+  // 獲取活動詳細統計 (修正 paymentStatus 為 status)
   const activities = await prisma.activity.findMany({
     where: {
       status: 'ACTIVE',
@@ -122,7 +129,7 @@ export default async function AnalyticsPage() {
         },
         select: {
           amount: true,
-          paymentStatus: true,
+          status: true,
         },
       },
     },
@@ -133,7 +140,7 @@ export default async function AnalyticsPage() {
     name: activity.name,
     totalExpense: activity.transactions.reduce((sum, t) => sum + t.amount, 0),
     unpaidAmount: activity.transactions
-      .filter(t => t.paymentStatus === 'UNPAID')
+      .filter(t => t.status === 'PENDING')
       .reduce((sum, t) => sum + t.amount, 0),
     transactionCount: activity.transactions.length,
   }));
@@ -164,7 +171,7 @@ export default async function AnalyticsPage() {
 
   // 處理分類圖表數據
   const categoryChartData = categoryExpenses.map(ce => ({
-    name: categories.find(c => c.id === ce.categoryId)?.name || '未分類',
+    name: categories.find(c => c.id === ce.categoryId)?.name || (locale === 'zh' ? '未分類' : 'Uncategorized'),
     value: ce._sum.amount || 0,
   }));
 
@@ -172,40 +179,58 @@ export default async function AnalyticsPage() {
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
 
-  const monthlyData = await prisma.transaction.groupBy({
-    by: ['type'],
-    where: {
-      date: {
-        gte: sixMonthsAgo,
+  // 獲取每月的數據
+  const monthlyComparisonData = [];
+  for (let i = 5; i >= 0; i--) {
+    const monthStart = new Date();
+    monthStart.setMonth(monthStart.getMonth() - i, 1);
+    monthStart.setHours(0, 0, 0, 0);
+    
+    const monthEnd = new Date(monthStart);
+    monthEnd.setMonth(monthEnd.getMonth() + 1, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+
+    const monthTransactions = await prisma.transaction.findMany({
+      where: {
+        date: {
+          gte: monthStart,
+          lte: monthEnd,
+        },
       },
-    },
-    _sum: {
-      amount: true,
-    },
-  });
+      select: {
+        amount: true,
+        type: true,
+      },
+    });
 
-  // 處理月度比較數據
-  const months = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    return date.toLocaleString('default', { month: 'short' });
-  }).reverse();
+    const monthlyStats = monthTransactions.reduce(
+      (acc, transaction) => {
+        if (transaction.type === 'INCOME') {
+          acc.income += transaction.amount;
+        } else {
+          acc.expense += transaction.amount;
+        }
+        return acc;
+      },
+      { income: 0, expense: 0 }
+    );
 
-  const monthlyComparisonData = months.map(month => ({
-    month,
-    income: Math.random() * 50000, // 這裡需要替換為實際數據
-    expense: Math.random() * 30000, // 這裡需要替換為實際數據
-  }));
+    monthlyComparisonData.push({
+      month: monthStart.toLocaleString(locale === 'zh' ? 'zh-TW' : 'en-US', { month: 'short' }),
+      income: monthlyStats.income,
+      expense: monthlyStats.expense,
+    });
+  }
 
   return (
     <div className="container mx-auto p-4 space-y-8">
-      <h1 className="text-2xl font-bold mb-6">統計分析</h1>
+      <h1 className="text-2xl font-bold mb-6">{t('title')}</h1>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* 本月收入 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">本月收入</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('this_month')} {t('total_income')}</CardTitle>
             <ArrowUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
@@ -216,7 +241,7 @@ export default async function AnalyticsPage() {
         {/* 本月支出 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">本月支出</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('this_month')} {t('total_expense')}</CardTitle>
             <ArrowDown className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
@@ -227,7 +252,7 @@ export default async function AnalyticsPage() {
         {/* 待付款金額 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">待付款金額</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('pending_payments')}</CardTitle>
             <CreditCard className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
@@ -238,7 +263,7 @@ export default async function AnalyticsPage() {
         {/* 活動總支出 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">活動總支出</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('activity_total_expense')}</CardTitle>
             <Activity className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
@@ -252,7 +277,7 @@ export default async function AnalyticsPage() {
       {/* 收支趨勢圖 */}
       <Card>
         <CardHeader>
-          <CardTitle>收支趨勢</CardTitle>
+          <CardTitle>{t('income_vs_expense')}</CardTitle>
         </CardHeader>
         <CardContent>
           <TransactionChart data={chartData} />
@@ -263,7 +288,7 @@ export default async function AnalyticsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>本月支出分類</CardTitle>
+            <CardTitle>{t('this_month')} {t('expense_by_category')}</CardTitle>
           </CardHeader>
           <CardContent>
             <CategoryChart data={categoryChartData} />
@@ -272,7 +297,7 @@ export default async function AnalyticsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>月度收支比較</CardTitle>
+            <CardTitle>{t('monthly_trend')}</CardTitle>
           </CardHeader>
           <CardContent>
             <MonthlyComparison data={monthlyComparisonData} />
@@ -282,7 +307,7 @@ export default async function AnalyticsPage() {
 
       {/* 活動統計 */}
       <div>
-        <h2 className="text-xl font-bold mb-4">活動統計</h2>
+        <h2 className="text-xl font-bold mb-4">{t('activity_stats')}</h2>
         <ActivityStats activities={activityStats} />
       </div>
     </div>

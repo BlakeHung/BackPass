@@ -240,6 +240,9 @@ const zh = {
     total_income: '總收入',
     total_expense: '總支出',
     net: '淨額',
+    pending_payments: '待付款金額',
+    activity_total_expense: '活動總支出',
+    activity_stats: '活動統計',
   },
   
   sidebar: {

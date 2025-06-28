@@ -246,6 +246,9 @@ const en = {
     total_income: 'Total Income',
     total_expense: 'Total Expense',
     net: 'Net',
+    pending_payments: 'Pending Payments',
+    activity_total_expense: 'Activity Total Expense',
+    activity_stats: 'Activity Statistics',
   },
   
   sidebar: {

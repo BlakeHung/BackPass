@@ -3,5 +3,5 @@ import { IntlConfig } from 'next-intl';
 
 export default {
   locale: defaultLocale,
-  : getMessages,
+  messages: getMessages,
 } satisfies IntlConfig; 
