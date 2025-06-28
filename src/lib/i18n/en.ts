@@ -74,6 +74,19 @@ const en = {
       ended: 'Ended'
     },
     new_activity: 'New Activity',
+    view_settlements: 'View Settlements',
+    ongoing: 'Ongoing',
+    ended: 'Ended',
+    expense_count: 'expenses',
+    edit_activity: 'Edit Activity',
+    edm_management: 'EDM Management',
+    activity_description: 'Activity Description',
+    edm_preview: 'EDM Preview',
+    register_now: 'Register Now',
+    expense_records: 'Expense Records',
+    no_description: 'No description',
+    recorder: 'Recorder',
+    no_expense_records: 'No expense records',
   },
   
   dashboard: {

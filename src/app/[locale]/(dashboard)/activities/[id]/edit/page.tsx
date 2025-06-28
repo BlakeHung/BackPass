@@ -3,36 +3,41 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { ActivityForm } from "@/components/ActivityForm";
-import { Metadata } from "next";
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 // 動態生成 metadata
-export async function generateMetadata({ params }: { params: { locale: string } }) {
-  const t = await getTranslations({ locale: params.locale, namespace: 'activity_edit' });
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'activities' });
   
   return {
-    title: t('title'),
-    description: t('description'),
+    title: t('edit_activity'),
+    description: t('edit_activity'),
   };
 }
 
 type PageProps = {
-  params: { id: string; locale: string };
-  searchParams: { [key: string]: string | string[] | undefined };
+  params: Promise<{ id: string; locale: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export default async function EditActivityPage({
   params,
   searchParams,
 }: PageProps) {
-  // 設置請求語言，啟用靜態渲染
-  setRequestLocale(params.locale);
+  // 等待 params 解析
+  const { id, locale } = await params;
   
-  const { id } = params;
+  // 設置請求語言，啟用靜態渲染
+  setRequestLocale(locale);
+  
+  // 等待 searchParams 解析
+  await searchParams;
+  
   const session = await getServerSession(authOptions);
   
   // 獲取翻譯
-  const t = await getTranslations({ locale: params.locale, namespace: 'activity_edit' });
+  const t = await getTranslations({ locale, namespace: 'activities' });
   
   if (!session || session.user.role !== 'ADMIN') {
     redirect('/transactions');
@@ -54,7 +59,7 @@ export default async function EditActivityPage({
       },
     },
   });
-
+  
   if (!activity) {
     notFound();
   }
@@ -70,7 +75,7 @@ export default async function EditActivityPage({
       },
     },
   });
-
+  
   // 準備表單初始值
   const selectedGroups = activity.groups.map(ag => ag.groupId);
   const groupMembers = activity.groups.flatMap(ag => 
@@ -80,7 +85,6 @@ export default async function EditActivityPage({
       isParticipating: m.isParticipating,
     }))
   );
-
   return (
     <div className="container mx-auto p-4">
       <div className="max-w-2xl mx-auto">

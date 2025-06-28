@@ -80,11 +80,12 @@ export const metadata = {
 
 export default async function LocaleLayout({
   children,
-  params: { locale }
+  params
 }: {
   children: React.ReactNode;
-  params: { locale: Locale };
+  params: Promise<{ locale: Locale }>;
 }) {
+  const { locale } = await params;
   setRequestLocale(locale);
   
   const messages = await getMessages(locale);

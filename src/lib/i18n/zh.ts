@@ -74,6 +74,19 @@ const zh = {
       ended: '已結束'
     },
     new_activity: '新增活動',
+    view_settlements: '查看結算',
+    ongoing: '進行中',
+    ended: '已結束',
+    expense_count: '筆支出',
+    edit_activity: '編輯活動',
+    edm_management: 'EDM 管理',
+    activity_description: '活動描述',
+    edm_preview: 'EDM 預覽',
+    register_now: '立即報名',
+    expense_records: '支出記錄',
+    no_description: '無描述',
+    recorder: '記錄者',
+    no_expense_records: '沒有支出記錄',
   },
   
   dashboard: {

@@ -6,26 +6,29 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { ShareButton } from "@/components/ShareButton";
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SettlementCenter } from "@/components/settlement/SettlementCenter";
+import { ActivitySettlement } from "@/components/settlement/ActivitySettlement";
 
 type PageProps = {
-  params: { id: string; locale: string };
-  searchParams: { [key: string]: string | string[] | undefined };
+  params: Promise<{ id: string; locale: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export default async function ActivityPage({
   params,
   searchParams,
 }: PageProps) {
-  // 設置請求語言，啟用靜態渲染
-  setRequestLocale(params.locale);
+  // 等待 params 解析
+  const { id, locale } = await params;
   
-  const { id } = params;
+  // 設置請求語言，啟用靜態渲染
+  setRequestLocale(locale);
+  
+  // 也等待 searchParams 解析
+  await searchParams;
   const session = await getServerSession(authOptions);
   
   // 獲取翻譯
-  const t = await getTranslations({ locale: params.locale, namespace: 'activity_detail' });
+  const t = await getTranslations({ locale: locale, namespace: 'activities' });
   
   if (!session) {
     redirect('/login');
@@ -34,27 +37,47 @@ export default async function ActivityPage({
   const activity = await prisma.activity.findUnique({
     where: { id },
     include: {
-      _count: {
-        select: { transactions: true }
+      groups: {
+        include: {
+          members: {
+            include: {
+              groupMember: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
       },
       transactions: {
         include: {
+          groupMember: {
+            select: {
+              id: true,
+              name: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
           category: true,
-          user: true,
-        },
-        orderBy: {
-          date: 'desc',
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
-      settlements: {
-        include: {
-          groupMember: true,
-          settledByUser: {
-            select: { name: true },
-          },
-          transactions: {
-            where: { isSettlementPayment: true },
-          },
+      settlements: true,
+      edm: true,
+      _count: {
+        select: {
+          transactions: true,
         },
       },
     },
@@ -64,8 +87,6 @@ export default async function ActivityPage({
     notFound();
   }
 
-  // 生成 EDM 分享連結
-  const edmLink = `${process.env.NEXT_PUBLIC_APP_URL}/edm/activities/${activity.id}`;
 
   return (
     <div className="space-y-6">
@@ -75,7 +96,7 @@ export default async function ActivityPage({
           href={`/activities/${activity.id}/settlements`}
           className="bg-blue-500 text-white px-4 py-2 rounded-lg"
         >
-          查看結算
+          {t('view_settlements')}
         </Link>
       </div>
       
@@ -91,7 +112,7 @@ export default async function ActivityPage({
                   {activity.status === 'ACTIVE' ? t('ongoing') : t('ended')}
                 </Badge>
                 <Badge variant="outline">
-                  {activity._count.transactions} {t('expense_count')}
+                  {activity._count?.transactions || 0} {t('expense_count')}
                 </Badge>
               </div>
             </div>
@@ -162,7 +183,7 @@ export default async function ActivityPage({
                         {transaction.category.name} • {new Date(transaction.date).toLocaleDateString()}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {t('recorder')}: {transaction.user.name}
+                        {t('recorder')}: {transaction.user?.name || 'Unknown'}
                       </p>
                     </div>
                     <p className="font-medium text-lg">
@@ -181,7 +202,7 @@ export default async function ActivityPage({
         </div>
       </div>
 
-      <SettlementCenter activity={activity} />
+      <ActivitySettlement activity={activity} />
     </div>
   );
 } 
